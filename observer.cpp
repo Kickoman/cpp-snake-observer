@@ -19,6 +19,7 @@ Observer::Observer(QObject *parent) : QObject(parent)
 void Observer::connectTo(const QHostAddress &address, quint16 port)
 {
     socket->connectToHost(address, port);
+    printf("Connection...\n");
 }
 
 void Observer::processInputUpdate()
@@ -40,10 +41,10 @@ void Observer::processInputUpdate()
         quint64 cellsCount = 0;
         stream >> cellsCount;
 
-        std::vector<std::pair<std::pair<int, int>, std::pair<int, qint64>>> cellsInfo;
+        std::vector<std::pair<std::pair<quint64, quint64>, std::pair<int, qint64>>> cellsInfo;
         for (quint64 i = 0; i < cellsCount; ++i)
         {
-            int x = 0, y = 0;
+            quint64 x = 0, y = 0;
             int type = 0;
             qint64 id = 0;
             stream >> x >> y >> type >> id;
@@ -56,7 +57,10 @@ void Observer::processInputUpdate()
         }
 
         if (!stream.commitTransaction())
+        {
+            printf("Bad trans\n");
             continue;
+        }
 
         if (static_cast<MessageType>(type) == MessageType::FullState)
         {
@@ -67,8 +71,8 @@ void Observer::processInputUpdate()
 
         for (const auto & info : cellsInfo)
         {
-            int x = info.first.first;
-            int y = info.first.second;
+            quint64 x = info.first.first;
+            quint64 y = info.first.second;
 
             CellType type = static_cast<CellType>(info.second.first);
             qint64 id = info.second.second;
