@@ -1,12 +1,6 @@
 #include "observer.h"
-
 #include <cstdio>
-
-enum class MessageType : qint32
-{
-    FullState = 1,
-    Update    = 2
-};
+#include "gamemessage.h"
 
 Observer::Observer(QObject *parent) : QObject(parent)
 {
@@ -26,56 +20,28 @@ void Observer::processInputUpdate()
 {
     while (socket->bytesAvailable())
     {
-        quint64 height = 0, width = 0;
-
-        stream.startTransaction();
-
-        qint32 type = 0;
-        stream >> type;
-
-        if (static_cast<MessageType>(type) == MessageType::FullState)
+        bool ok = false;
+        auto msg = GameMessage::deserialize(socket, &ok);
+        if (!ok)
         {
-            stream >> width >> height;
-        }
-
-        quint64 cellsCount = 0;
-        stream >> cellsCount;
-
-        std::vector<std::pair<std::pair<qint64, qint64>, std::pair<int, qint64>>> cellsInfo;
-        for (quint64 i = 0; i < cellsCount; ++i)
-        {
-            qint64 x = 0, y = 0;
-            int type = 0;
-            qint64 id = 0;
-            stream >> x >> y >> type >> id;
-            cellsInfo.push_back(
-                std::make_pair(
-                    std::make_pair(x, y),
-                    std::make_pair(type, id)
-                    )
-                );
-        }
-
-        if (!stream.commitTransaction())
-        {
-            printf("Bad trans\n");
+            printf("Bad deserialization :(\n");
             continue;
         }
 
-        if (static_cast<MessageType>(type) == MessageType::FullState)
+        if (msg.type == MessageType::FullState)
         {
-            field.resize(height);
-            for (auto &row : field)
-                row.resize(width);
+            field.resize(int(msg.fieldHeight));
+            for (auto & row : field)
+                row.resize(int(msg.fieldWidth));
         }
 
-        for (const auto & info : cellsInfo)
+        for (const auto & info : msg.cells)
         {
-            qint64 x = info.first.first;
-            qint64 y = info.first.second;
+            qint64 x = info.coordX;
+            qint64 y = info.coordY;
 
-            CellType type = static_cast<CellType>(info.second.first);
-            qint64 id = info.second.second;
+            CellType type = static_cast<CellType>(info.type);
+            qint64 id = info.internalId;
 
             field[y][x].type = type;
             field[y][x].id = id;
